@@ -178,7 +178,7 @@
         const inputContainer = document.getElementById('inputContainer');
 
         async function loadLeaderboard() {
-            if (!firebaseEnabled || !currentUser || !db) {
+            if (!firebaseEnabled || !currentUser || !db || !getDocs || !collection) {
                 leaderboardList.innerHTML = '<div class="text-gray-600 text-center mt-8">SECTOR CLEAR. NO RECORDS. (OFFLINE MODE)</div>';
                 return;
             }
@@ -213,7 +213,7 @@
         submitBtn.addEventListener('click', async () => {
             const name = nameInput.value.trim() || "UNKNOWN";
             const score = Math.floor(game.score);
-            if (!firebaseEnabled || !currentUser || !db) {
+            if (!firebaseEnabled || !currentUser || !db || !addDoc || !collection || !serverTimestamp) {
                 submitBtn.textContent = "OFFLINE";
                 setTimeout(() => {
                     submitBtn.textContent = "UPLOAD";
