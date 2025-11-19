@@ -105,33 +105,48 @@
             try { firebaseConfig = JSON.parse(__firebase_config); } 
             catch (e) { console.error("Error parsing global config:", e); }
         }
-        if (!firebaseConfig) firebaseConfig = {};
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         // --- FIREBASE INIT ---
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+        let app = null;
+        let auth = null;
+        let db = null;
         let currentUser = null;
+        let firebaseEnabled = false;
 
-        const initAuth = async () => {
-             try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-             } catch (e) {
-                 console.error("Auth Error:", e);
-             }
-        };
-        initAuth();
+        // Only initialize Firebase if we have a valid config with required properties
+        if (firebaseConfig && firebaseConfig.apiKey) {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+                firebaseEnabled = true;
 
-        onAuthStateChanged(auth, (user) => {
-            currentUser = user;
-            if(user) loadLeaderboard();
-        });
+                const initAuth = async () => {
+                     try {
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                     } catch (e) {
+                         console.error("Auth Error:", e);
+                     }
+                };
+                initAuth();
+
+                onAuthStateChanged(auth, (user) => {
+                    currentUser = user;
+                    if(user) loadLeaderboard();
+                });
+            } catch (e) {
+                console.error("Firebase initialization error:", e);
+                firebaseEnabled = false;
+            }
+        } else {
+            console.log("Firebase not configured - running in offline mode");
+        }
 
         // --- LEADERBOARD LOGIC ---
         const leaderboardList = document.getElementById('leaderboardList');
@@ -140,7 +155,10 @@
         const inputContainer = document.getElementById('inputContainer');
 
         async function loadLeaderboard() {
-            if (!currentUser) return;
+            if (!firebaseEnabled || !currentUser || !db) {
+                leaderboardList.innerHTML = '<div class="text-gray-600 text-center mt-8">SECTOR CLEAR. NO RECORDS. (OFFLINE MODE)</div>';
+                return;
+            }
             try {
                 const querySnapshot = await getDocs(collection(db, 'artifacts', appId, 'public', 'data', 'leaderboard'));
                 const scores = [];
@@ -172,7 +190,14 @@
         submitBtn.addEventListener('click', async () => {
             const name = nameInput.value.trim() || "UNKNOWN";
             const score = Math.floor(game.score);
-            if (!currentUser) return;
+            if (!firebaseEnabled || !currentUser || !db) {
+                submitBtn.textContent = "OFFLINE";
+                setTimeout(() => {
+                    submitBtn.textContent = "UPLOAD";
+                    submitBtn.disabled = false;
+                }, 2000);
+                return;
+            }
             submitBtn.textContent = "...";
             submitBtn.disabled = true;
             try {
