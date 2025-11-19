@@ -89,9 +89,34 @@
 
     <!-- Firebase Libraries -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- FIREBASE INIT ---
+        let app = null;
+        let auth = null;
+        let db = null;
+        let currentUser = null;
+        let firebaseEnabled = false;
+        let initializeApp, getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged;
+        let collection, addDoc, getDocs, serverTimestamp, getFirestore;
+
+        // Try to load Firebase modules, but don't fail if they don't load
+        try {
+            const firebaseApp = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
+            const firebaseAuth = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js");
+            const firebaseFirestore = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
+            
+            initializeApp = firebaseApp.initializeApp;
+            getAuth = firebaseAuth.getAuth;
+            signInAnonymously = firebaseAuth.signInAnonymously;
+            signInWithCustomToken = firebaseAuth.signInWithCustomToken;
+            onAuthStateChanged = firebaseAuth.onAuthStateChanged;
+            getFirestore = firebaseFirestore.getFirestore;
+            collection = firebaseFirestore.collection;
+            addDoc = firebaseFirestore.addDoc;
+            getDocs = firebaseFirestore.getDocs;
+            serverTimestamp = firebaseFirestore.serverTimestamp;
+        } catch (e) {
+            console.warn("Firebase modules not available:", e);
+        }
 
         // --- CONFIGURATION ---
         let firebaseConfig;
@@ -108,15 +133,8 @@
 
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
-        // --- FIREBASE INIT ---
-        let app = null;
-        let auth = null;
-        let db = null;
-        let currentUser = null;
-        let firebaseEnabled = false;
-
-        // Only initialize Firebase if we have a valid config with required properties
-        if (firebaseConfig && firebaseConfig.apiKey) {
+        // Only initialize Firebase if we have a valid config with required properties AND modules loaded
+        if (firebaseConfig && firebaseConfig.apiKey && initializeApp && getAuth && getFirestore) {
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
@@ -132,6 +150,7 @@
                         }
                      } catch (e) {
                          console.error("Auth Error:", e);
+                         firebaseEnabled = false;
                      }
                 };
                 initAuth();
@@ -145,7 +164,11 @@
                 firebaseEnabled = false;
             }
         } else {
-            console.log("Firebase not configured - running in offline mode");
+            if (!initializeApp) {
+                console.log("Firebase SDK not loaded - running in offline mode");
+            } else {
+                console.log("Firebase not configured - running in offline mode");
+            }
         }
 
         // --- LEADERBOARD LOGIC ---
